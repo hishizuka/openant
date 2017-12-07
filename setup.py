@@ -26,6 +26,7 @@ from __future__ import absolute_import, print_function
 
 import os
 import shutil
+import platform
 
 from distutils.util import execute
 from distutils.cmd import Command
@@ -45,6 +46,8 @@ def udev_trigger():
 
 def install_udev_rules(raise_exception):
     if check_root():
+        if platform.system() != 'Linux':
+            return
         shutil.copy('resources/ant-usb-sticks.rules', '/etc/udev/rules.d')
         execute(udev_reload_rules, [], "Reloading udev rules")
         execute(udev_trigger, [], "Triggering udev rules")
