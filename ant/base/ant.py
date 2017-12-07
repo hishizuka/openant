@@ -49,6 +49,9 @@ _logger = logging.getLogger("ant.base.ant")
 
 class Ant():
     _RESET_WAIT = 1
+    _WAIT = 0.24
+    _WAIT_PERIOD = 0.24
+    _WAIT_SCAN = 0.10
 
     def __init__(self):
 
@@ -164,7 +167,11 @@ class Ant():
 
                 # Send messages in queue, on indicated time slot
                 if message._id == Message.ID.BROADCAST_DATA:
-                    time.sleep(0.1)
+                    l = len(self._buffer)
+                    if l < 5:
+                        time.sleep(self._WAIT)  # variable
+                    else:
+                        pass
                     _logger.debug("Got broadcast data, examine queue to see if we should send anything back")
                     if self._message_queue_cond.acquire(blocking=False):
                         while len(self._message_queue) > 0:
@@ -213,13 +220,54 @@ class Ant():
 
 
     def read_message(self):
+
+        def getIndex(buf, times):
+            index = None
+            count = 0
+            state_flg = 'Nothing'
+            for i, x in enumerate(buf):
+                if x == 0xa4:
+                    index = i
+                    count += 1
+                if count == times: break
+            if index != None and count == times:
+                state_flg = 'Delete'
+            return(state_flg, index)
+
         while self._running:
             # If we have a message in buffer already, return it
-            if len(self._buffer) >= 5 and len(self._buffer) >= self._buffer[1] + 4:
-                packet = self._buffer[:self._buffer[1] + 4]
-                self._buffer = self._buffer[self._buffer[1] + 4:]
+            # Add multiple packets cutting logic
+
+            state_flg = ''
+            index = None
+            length = 0
+            #print("buf",format_list(self._buffer))
+
+            if len(self._buffer) < 5:
+                state_flg = 'Nothing'
+            else:
+                if self._buffer[0] != 0xa4:
+                    (state_flg, index) = getIndex(self._buffer, 1)
+                else:
+                    length = self._buffer[1] + 4
+                    if len(self._buffer) == length:
+                        state_flg = 'Normal'
+                    elif len(self._buffer) < length:
+                        state_flg = 'Nothing'
+                    else:
+                        next_header = self._buffer[length]
+                        if next_header == 0xa4:
+                            state_flg = 'Normal'
+                        else:
+                            (state_flg, index) = getIndex(self._buffer, 2)
+            #print(state_flg)
+            if state_flg == 'Normal':
+                packet = self._buffer[:length]
+                self._buffer = self._buffer[length:]
+                #print("< ", format_list(packet))
                 return Message.parse(packet)
-            # Otherwise, read some data and call the function again
+            elif state_flg == 'Delete':
+                self._buffer = self._buffer[index:]
             else:
                 data = self._driver.read()
                 self._buffer.extend(data)
@@ -229,14 +277,22 @@ class Ant():
     # Ant functions
 
     def unassign_channel(self, channel):
-        pass
+        message = Message(Message.ID.UNASSIGN_CHANNEL, [channel])
+        self.write_message(message)
 
-    def assign_channel(self, channel, channelType, networkNumber):
+    def assign_channel(self, channel, channelType, networkNumber, extend=0x00):
         message = Message(Message.ID.ASSIGN_CHANNEL, [channel, channelType, networkNumber])
+        if extend != 0x00:
+            message = Message(Message.ID.ASSIGN_CHANNEL, [channel, channelType, networkNumber, extend])
         self.write_message(message)
 
     def open_channel(self, channel):
         message = Message(Message.ID.OPEN_CHANNEL, [channel])
+        self._WAIT = self._WAIT_PERIOD
+        self.write_message(message)
+
+    def close_channel(self, channel):
+        message = Message(Message.ID.CLOSE_CHANNEL, [channel])
         self.write_message(message)
 
     def set_channel_id(self, channel, deviceNum, deviceType, transmissionType):
@@ -245,12 +301,17 @@ class Ant():
         self.write_message(message)
 
     def set_channel_period(self, channel, messagePeriod):
+        self._WAIT_PERIOD = 1 / round(32000 / messagePeriod, 0) - 0.01
         data = array.array('B', struct.pack("<BH", channel, messagePeriod))
         message = Message(Message.ID.SET_CHANNEL_PERIOD, data)
         self.write_message(message)
 
     def set_channel_search_timeout(self, channel, timeout):
         message = Message(Message.ID.SET_CHANNEL_SEARCH_TIMEOUT, [channel, timeout])
+        self.write_message(message)
+
+    def set_low_priority_search_timeout(self, channel, timeout):
+        message = Message(Message.ID.LOW_PRIORITY_CHANNEL_SEARCH_TIMEOUT, [channel, timeout])
         self.write_message(message)
 
     def set_channel_rf_freq(self, channel, rfFreq):
@@ -272,6 +333,28 @@ class Ant():
         message = Message(Message.ID.RESET_SYSTEM, [0x00])
         self.write_message(message)
         time.sleep(self._RESET_WAIT)
+
+    def set_extended_message(self, on_off):
+        message = Message(Message.ID.ENABLE_EXT_RX_MESGS, [0, on_off])
+        self.write_message(message)
+
+    def set_lib_config(self, value):
+        message = Message(Message.ID.LIB_CONFIG, [0, value])
+        self.write_message(message)
+
+    def set_tx_power(self, value):
+        message = Message(Message.ID.SET_TRANSMIT_POWER, [0x00, value])
+        self.write_message(message)
+
+    def set_channel_tx_power(self, channel, value):
+        message = Message(Message.ID.SET_CHANNEL_TX_POWER, [0x00, channel, value])
+        self.write_message(message)
+
+    def continuous_scan(self):
+        # message = Message(Message.ID.OPEN_RX_SCAN_MODE, [0])
+        message = Message(Message.ID.OPEN_RX_SCAN_MODE, [0, 1])
+        self._WAIT = self._WAIT_SCAN
+        self.write_message(message)
 
     def request_message(self, channel, messageId):
         message = Message(Message.ID.REQUEST_MESSAGE, [channel, messageId])
@@ -309,3 +392,4 @@ class Ant():
 
     def channel_event_function(self, channel, event, data):
         pass
+

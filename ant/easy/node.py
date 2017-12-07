@@ -67,6 +67,14 @@ class Node():
         channel._assign(ctype, 0x00)
         return channel
 
+    def new_channel_for_search(self, ctype):
+        size = len(self.channels)
+        channel = Channel(size, self, self.ant)
+        self.channels[size] = channel
+        # last 0x01 is extend assignment (Background Scanning Enable) in channel assign
+        channel._assign(ctype, 0x00, 0x01)
+        return channel
+
     def request_message(self, messageId):
         _logger.debug("requesting message %#02x", messageId)
         self.ant.request_message(0, messageId)
@@ -76,6 +84,28 @@ class Node():
     def set_network_key(self, network, key):
         self.ant.set_network_key(network, key)
         return self.wait_for_response(Message.ID.SET_NETWORK_KEY)
+
+    def set_extended_message(self, on_off):
+        # 0: off, 1: on
+        self.ant.set_extended_message(on_off)
+        return self.wait_for_response(Message.ID.ENABLE_EXT_RX_MESGS)
+
+    def set_lib_config(self, value):
+        # 0: Disabled
+        # 0x20: Enables Rx Timestamp Output
+        # 0x40: Enables RSSI Output
+        # 0x80: Enables Channel ID Output
+        self.ant.set_lib_config(value)
+        return self.wait_for_response(Message.ID.LIB_CONFIG)
+
+    def set_tx_power(self, value):
+        # 0: low, 1...2, 3: High(0dBm), (4: N/A or High(4dbm))
+        self.ant.set_tx_power(value)
+        return self.wait_for_response(Message.ID.SET_TRANSMIT_POWER)
+
+    def continuous_scan(self):
+        self.ant.continuous_scan()
+        return self.wait_for_response(Message.ID.OPEN_RX_SCAN_MODE)
 
     def wait_for_event(self, ok_codes):
         return wait_for_event(ok_codes, self._events, self._event_cond)

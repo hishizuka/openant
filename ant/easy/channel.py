@@ -56,16 +56,21 @@ class Channel():
     def wait_for_special(self, event_id):
         return wait_for_special(event_id, self._node._responses, self._node._responses_cond)
 
-    def _assign(self, channelType, networkNumber):
-        self._ant.assign_channel(self.id, channelType, networkNumber)
+    def _assign(self, channelType, networkNumber, extend=0x00):
+        self._ant.assign_channel(self.id, channelType, networkNumber, extend)
         return self.wait_for_response(Message.ID.ASSIGN_CHANNEL)
 
     def _unassign(self):
-        pass
+        self._ant.unassign_channel(self.id)
+        return self.wait_for_response(Message.ID.ASSIGN_CHANNEL)
 
     def open(self):
         self._ant.open_channel(self.id)
         return self.wait_for_response(Message.ID.OPEN_CHANNEL)
+
+    def close(self):
+        self._ant.close_channel(self.id)
+        return self.wait_for_response(Message.ID.CLOSE_CHANNEL)
 
     def set_id(self, deviceNum, deviceType, transmissionType):
         self._ant.set_channel_id(self.id, deviceNum, deviceType, transmissionType)
@@ -79,9 +84,18 @@ class Channel():
         self._ant.set_channel_search_timeout(self.id, timeout)
         return self.wait_for_response(Message.ID.SET_CHANNEL_SEARCH_TIMEOUT)
 
+    def set_low_priority_search_timeout(self, timeout):
+        self._ant.set_low_priority_search_timeout(self.id, timeout)
+        return self.wait_for_response(Message.ID.LOW_PRIORITY_CHANNEL_SEARCH_TIMEOUT)
+
     def set_rf_freq(self, rfFreq):
         self._ant.set_channel_rf_freq(self.id, rfFreq)
         return self.wait_for_response(Message.ID.SET_CHANNEL_RF_FREQ)
+
+    def set_channel_tx_power(self, value):
+        # 0: low, 1...2, 3: High(0dBm), (4: N/A or High(4dbm))
+        self._ant.set_channel_tx_power(self.id, value)
+        return self.wait_for_response(Message.ID.SET_CHANNEL_TX_POWER)
 
     def set_search_waveform(self, waveform):
         self._ant.set_search_waveform(self.id, waveform)
