@@ -71,6 +71,9 @@ class Channel():
     def close(self):
         self._ant.close_channel(self.id)
         return self.wait_for_response(Message.ID.CLOSE_CHANNEL)
+ 
+    def get_channel_status(self):
+        return self.request_message(Message.ID.RESPONSE_CHANNEL_STATUS)
 
     def set_id(self, deviceNum, deviceType, transmissionType):
         self._ant.set_channel_id(self.id, deviceNum, deviceType, transmissionType)

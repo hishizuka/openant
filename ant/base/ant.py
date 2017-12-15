@@ -49,9 +49,10 @@ _logger = logging.getLogger("ant.base.ant")
 
 class Ant():
     _RESET_WAIT = 1
-    _WAIT = 0.24
-    _WAIT_PERIOD = 0.24
+    _WAIT = 0.01
     _WAIT_SCAN = 0.10
+    _WAIT_ACTION = 0.01
+    _WAIT_PERIOD = 0.01
 
     def __init__(self):
 
@@ -116,6 +117,7 @@ class Ant():
 
         while self._running:
             try:
+                #print("self._WAIT:",self._WAIT)
                 message = self.read_message()
 
                 if message is None:
@@ -217,7 +219,7 @@ class Ant():
         data = message.get()
         self._driver.write(data)
         _logger.debug("Write data: %s", format_list(data))
-
+        #print("> ", format_list(data))
 
     def read_message(self):
 
@@ -288,7 +290,6 @@ class Ant():
 
     def open_channel(self, channel):
         message = Message(Message.ID.OPEN_CHANNEL, [channel])
-        self._WAIT = self._WAIT_PERIOD
         self.write_message(message)
 
     def close_channel(self, channel):
@@ -353,7 +354,6 @@ class Ant():
     def continuous_scan(self):
         # message = Message(Message.ID.OPEN_RX_SCAN_MODE, [0])
         message = Message(Message.ID.OPEN_RX_SCAN_MODE, [0, 1])
-        self._WAIT = self._WAIT_SCAN
         self.write_message(message)
 
     def request_message(self, channel, messageId):
@@ -392,4 +392,13 @@ class Ant():
 
     def channel_event_function(self, channel, event, data):
         pass
+
+    def set_wait_period(self):
+      self._WAIT = self._WAIT_PERIOD
+    
+    def set_wait_scan(self):
+      self._WAIT = self._WAIT_SCAN
+
+    def set_wait_action(self):
+      self._WAIT = self._WAIT_ACTION
 
