@@ -243,7 +243,7 @@ class Ant():
             state_flg = ''
             index = None
             length = 0
-            #print("buf",format_list(self._buffer))
+            #if len(self._buffer) > 0: print("buf",format_list(self._buffer)) 
 
             if len(self._buffer) < 5:
                 state_flg = 'Nothing'
